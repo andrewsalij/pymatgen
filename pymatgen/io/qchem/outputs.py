@@ -139,6 +139,9 @@ class QCOutput(MSONable):
         if read_pattern(self.text, {"key": r"solvent_method\s*=?\s*smd"}, terminate_on_match=True).get("key") == [[]]:
             self.data["solvent_method"] = "SMD"
 
+        # Parse TDDFT excited states if present
+        if read_pattern(self.text, {"key": r"TDDFT/TDA Excitation Energies"}, terminate_on_match=True).get("key") == [[]]:
+            self._read_excited_state_data()
         # Parse information specific to a solvent model
         if self.data["solvent_method"] == "PCM":
             self.data["solvent_data"] = {}
@@ -1236,6 +1239,26 @@ class QCOutput(MSONable):
         ]
         for key in pcm_keys:
             self.data["solvent_data"][key] = None
+
+# Parses TDDFT excited state outputs
+    def _read_excited_state_data(self):
+        exited_state_energies = read_pattern(self.text, {
+            "key": r" Excited state  *\d*: excitation energy \(eV\) =    ([\d,.]*)"}).get("key")
+        excited_state_total_energies = read_pattern(self.text,
+                                                          {"key": r"Total energy for state  *\d*:[ ]* ([-,.\d]*)"}).get(
+            "key")
+        excited_state_multiplicity = read_pattern(self.text,
+                                          {"key": r"Multiplicity: ([a-z,A-Z]*)"}).get("key")
+
+        transition_moments = read_pattern(self.text, {
+            "key": r"Trans. Mom.:[ ]*([-.\d]*)[ ]*X[ ]*([-.\d]*) Y[ ]*([-.\d]*) Z"}).get("key")
+        osc_strength = read_pattern(self.text, {"key": r"Strength[ ]*:[ ]*([-.\d]*)"}).get("key")
+
+        self.data["excited_state_energies"] = exited_state_energies
+        self.data["excited_state_total_energies"] = excited_state_total_energies
+        self.data["excited_state_multiplicity"] = excited_state_multiplicity
+        self.data["transition_dipole_moments"] = transition_moments
+        self.data["transition_oscillator_strengths"] = osc_strength
 
     def _check_completion_errors(self):
         """
